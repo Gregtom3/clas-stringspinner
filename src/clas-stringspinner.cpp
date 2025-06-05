@@ -45,7 +45,10 @@ static bool                     enable_patch_boost       = false;
 // cut checklists
 clas::CheckList cut_inclusive{"cut-inclusive", clas::CheckList::kNoCuts};
 clas::CheckList cut_theta{"cut-theta", clas::CheckList::k1hCuts};
+clas::CheckList cut_P{"cut-P", clas::CheckList::k1hCuts};
 clas::CheckList cut_z_2h{"cut-z-2h", clas::CheckList::k2hCuts};
+
+
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -151,6 +154,11 @@ CUTS FOR EVENT SELECTION:
                                    MIN <= theta <= MAX, for all particles in PDG...
                                    - example: charged pions in 10-30 degrees:
                                        --cut-theta 10,30,211,-211
+      
+  --cut-P MIN,MAX,PDG...           if set, event must include particles such that
+                                   MIN <= P <= MAX, for all particles in PDG...
+                                   - example: charged pions in 1-5 GeV:
+                                       --cut-P 1,5,211,-211
 
   --cut-z-2h MIN,MAX,PDG1,PDG2     if set, event must include a (PDG1, PDG2)
                                    dihadron with MIN <= dihadron z <= MAX
@@ -230,6 +238,7 @@ int main(int argc, char** argv)
     opt_target_spin,
     opt_cut_inclusive,
     opt_cut_theta,
+    opt_cut_P,
     opt_cut_z_2h,
     opt_config,
     opt_seed,
@@ -254,6 +263,7 @@ int main(int argc, char** argv)
     {"target-spin",       required_argument, nullptr, opt_target_spin},
     {"cut-inclusive",     required_argument, nullptr, opt_cut_inclusive},
     {"cut-theta",         required_argument, nullptr, opt_cut_theta},
+    {"cut-P",             required_argument, nullptr, opt_cut_P},
     {"cut-z-2h",          required_argument, nullptr, opt_cut_z_2h},
     {"config",            required_argument, nullptr, opt_config},
     {"seed",              required_argument, nullptr, opt_seed},
@@ -284,6 +294,7 @@ int main(int argc, char** argv)
       case opt_target_spin: spin_type[objTarget] = std::string(optarg); break;
       case opt_cut_inclusive: cut_inclusive.Setup(optarg); break;
       case opt_cut_theta: cut_theta.Setup(optarg); break;
+      case opt_cut_P: cut_P.Setup(optarg); break;
       case opt_cut_z_2h: cut_z_2h.Setup(optarg); break;
       case opt_config: config_name = std::string(optarg); break;
       case opt_seed: seed = std::stoi(optarg); break;
@@ -601,7 +612,14 @@ int main(int argc, char** argv)
     if(!cut_theta.Check(evt, get_theta))
       continue;
 
-
+    // check momentum cuts
+    auto get_pmag = [](Pythia8::Particle const & par) {
+      return std::hypot(par.px(), par.py(), par.pz());
+    };
+      
+    if(!cut_P.Check(evt, get_pmag))
+      continue;
+      
     //
     // First, loop over final state photons (pid==22) and form pi0's.
     // For each unique (gamma_i, gamma_j) pair we append a fake pi0 (pid=111, status=-1)
