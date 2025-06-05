@@ -48,7 +48,18 @@ clas::CheckList cut_theta{"cut-theta", clas::CheckList::k1hCuts};
 clas::CheckList cut_P{"cut-P", clas::CheckList::k1hCuts};
 clas::CheckList cut_z_2h{"cut-z-2h", clas::CheckList::k2hCuts};
 
+// event-level DIS cuts
+static bool  cut_x_enabled  = false;
+static double cut_x_min     = 0.0;
+static double cut_x_max     = 0.0;
 
+static bool  cut_Q2_enabled = false;
+static double cut_Q2_min    = 0.0;
+static double cut_Q2_max    = 0.0;
+
+static bool  cut_W_enabled  = false;
+static double cut_W_min     = 0.0;
+static double cut_W_max     = 0.0;
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -142,7 +153,15 @@ GENERATOR PARAMETERS:
 
 
 CUTS FOR EVENT SELECTION:
+ --cut-x MIN,MAX                  if set, require Bjorken x [MIN,MAX]
+                                   (Bjorken x = Q2 / (2 p q), with p=target, q=virtual photon)
 
+  --cut-Q2 MIN,MAX                 if set, require Q2 [MIN,MAX]
+                                   (Q2 = −(virtual photon four‐momentum)^2)
+
+  --cut-W MIN,MAX                  if set, require W  [MIN,MAX]
+                                   (W2 = Mp2 + 2 Mp nu − Q2, with Mp=proton mass, nu=energy transfer)
+      
   --cut-inclusive PDG...           if set, event must include all particles with these
                                    PDG codes
                                    - PDG... is delimited by commas; no spaces
@@ -236,6 +255,9 @@ int main(int argc, char** argv)
     opt_pol_type,
     opt_beam_spin,
     opt_target_spin,
+    opt_cut_x,     
+    opt_cut_Q2,     
+    opt_cut_W, 
     opt_cut_inclusive,
     opt_cut_theta,
     opt_cut_P,
@@ -261,6 +283,9 @@ int main(int argc, char** argv)
     {"pol-type",          required_argument, nullptr, opt_pol_type},
     {"beam-spin",         required_argument, nullptr, opt_beam_spin},
     {"target-spin",       required_argument, nullptr, opt_target_spin},
+    {"cut-x",             required_argument, nullptr, opt_cut_x},
+    {"cut-Q2",            required_argument, nullptr, opt_cut_Q2},
+    {"cut-W",             required_argument, nullptr, opt_cut_W},
     {"cut-inclusive",     required_argument, nullptr, opt_cut_inclusive},
     {"cut-theta",         required_argument, nullptr, opt_cut_theta},
     {"cut-P",             required_argument, nullptr, opt_cut_P},
@@ -292,6 +317,71 @@ int main(int argc, char** argv)
       case opt_pol_type: pol_type = std::string(optarg); break;
       case opt_beam_spin: spin_type[objBeam] = std::string(optarg); break;
       case opt_target_spin: spin_type[objTarget] = std::string(optarg); break;
+///////////////// CASES FOR DIS VARIABLES (need to fold into CheckList.h) //////////////////////////
+      case opt_cut_x: {
+        std::string s(optarg);
+        size_t comma = s.find(',');
+        if(comma == std::string::npos) {
+          fmt::print(stderr, "Error: '--cut-x' requires MIN,MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        try {
+          cut_x_min = std::stod(s.substr(0, comma));
+          cut_x_max = std::stod(s.substr(comma + 1));
+        } catch(...) {
+          fmt::print(stderr, "Error: invalid numbers in '--cut-x {}'\n", optarg);
+          return clas::EXIT_ERROR;
+        }
+        if(cut_x_min >= cut_x_max) {
+          fmt::print(stderr, "Error: '--cut-x': MIN >= MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        cut_x_enabled = true;
+        break;
+      }
+      case opt_cut_Q2: {
+        std::string s(optarg);
+        size_t comma = s.find(',');
+        if(comma == std::string::npos) {
+          fmt::print(stderr, "Error: '--cut-Q2' requires MIN,MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        try {
+          cut_Q2_min = std::stod(s.substr(0, comma));
+          cut_Q2_max = std::stod(s.substr(comma + 1));
+        } catch(...) {
+          fmt::print(stderr, "Error: invalid numbers in '--cut-Q2 {}'\n", optarg);
+          return clas::EXIT_ERROR;
+        }
+        if(cut_Q2_min >= cut_Q2_max) {
+          fmt::print(stderr, "Error: '--cut-Q2': MIN >= MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        cut_Q2_enabled = true;
+        break;
+      }
+      case opt_cut_W: {
+        std::string s(optarg);
+        size_t comma = s.find(',');
+        if(comma == std::string::npos) {
+          fmt::print(stderr, "Error: '--cut-W' requires MIN,MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        try {
+          cut_W_min = std::stod(s.substr(0, comma));
+          cut_W_max = std::stod(s.substr(comma + 1));
+        } catch(...) {
+          fmt::print(stderr, "Error: invalid numbers in '--cut-W {}'\n", optarg);
+          return clas::EXIT_ERROR;
+        }
+        if(cut_W_min >= cut_W_max) {
+          fmt::print(stderr, "Error: '--cut-W': MIN >= MAX\n");
+          return clas::EXIT_ERROR;
+        }
+        cut_W_enabled = true;
+        break;
+      }
+///////////////// CASES FOR DIS VARIABLES (need to fold into CheckList.h) //////////////////////////
       case opt_cut_inclusive: cut_inclusive.Setup(optarg); break;
       case opt_cut_theta: cut_theta.Setup(optarg); break;
       case opt_cut_P: cut_P.Setup(optarg); break;
@@ -331,8 +421,25 @@ int main(int argc, char** argv)
     fmt::println("{:>30} = {:?}", "pol-type", pol_type);
     fmt::println("{:>30} = {:?}", "beam-spin", spin_type[objBeam]);
     fmt::println("{:>30} = {:?}", "target-spin", spin_type[objTarget]);
+///////////////// CASES FOR DIS VARIABLES (need to fold into CheckList.h) //////////////////////////
+    if(cut_x_enabled)
+      fmt::println("{:>30} = [{:.3g}, {:.3g}]", "cut-x", cut_x_min, cut_x_max);
+    else
+      fmt::println("{:>30} = disabled", "cut-x");
+
+    if(cut_Q2_enabled)
+      fmt::println("{:>30} = [{:.3g}, {:.3g}]", "cut-Q2", cut_Q2_min, cut_Q2_max);
+    else
+      fmt::println("{:>30} = disabled", "cut-Q2");
+
+    if(cut_W_enabled)
+      fmt::println("{:>30} = [{:.3g}, {:.3g}]", "cut-W", cut_W_min, cut_W_max);
+    else
+      fmt::println("{:>30} = disabled", "cut-W");
+///////////////// CASES FOR DIS VARIABLES (need to fold into CheckList.h) //////////////////////////
     fmt::println("{:>30} = {}", "cut-inclusive", cut_inclusive.GetInfoString());
     fmt::println("{:>30} = {}", "cut-theta", cut_theta.GetInfoString());
+    fmt::println("{:>30} = {}", "cut-P", cut_P.GetInfoString());
     fmt::println("{:>30} = {}", "cut-z-2h", cut_z_2h.GetInfoString());
     fmt::println("{:>30} = {:?}", "patch-boost", patch_boost);
     fmt::println("{:>30} = {}", "seed", seed);
@@ -551,6 +658,7 @@ int main(int argc, char** argv)
   decltype(num_events) evnum = 0;
   while(true && num_events>0) {
 
+
     // generate next event
     if(enable_count_before_cuts && evnum >= num_events)
       break;
@@ -587,20 +695,65 @@ int main(int argc, char** argv)
       boost_to_lab.bst(par__evt.p(), par__proc.p());
       evt.rotbst(boost_to_lab);
     }
-    // check that the event-record frame matches the hard-process frame, which is assumed to be the lab frame
-    // for(auto const& [name, row] : std::vector<std::pair<std::string,int>>{{"beam", BEAM_ROW}, {"target", TARGET_ROW}}) {
-    //   auto diff = std::max(
-    //       std::abs(evt[row].pz() - proc[row].pz()),
-    //       std::abs(evt[row].e()  - proc[row].e())
-    //       );
-    //   if(diff > 0.0001)
-    //     EventError("mismatch of event-frame and hard-process-frame {} momentum; use '--verbose' for details', and consider changing the value of the '--patch-boost' option", name);
-    //   if(clas::enable_verbose_mode) {
-    //     fmt::println("hard process {:<8} pz = {:<20.10}  E = {:<20.10}", name, proc[row].pz(), proc[row].e());
-    //     fmt::println("event record {:<8} pz = {:<20.10}  E = {:<20.10}", name, evt[row].pz(),  evt[row].e());
-    //   }
-    // }
+      
+    // Get initial lepton, target, and scattered leptoon
+    auto const& initialLepton  = evt.at(BEAM_ROW);
+    auto const& initialTarget  = evt.at(TARGET_ROW);
+    // find scattered lepton
+    auto const lepton_idx = FindScatteredLepton(evt);
+    if(!lepton_idx.has_value()) { // no scattered lepton -> skip event
+      if(clas::enable_verbose_mode) fmt::println("no scattered lepton found");
+      continue;
+    }
+    auto const& scatteredLepton  = evt.at(lepton_idx.value());      
+    // virtual photon 4‐vector: q = initialLepton − scatteredLepton
+    Pythia8::Vec4 q4(
+      initialLepton.px() - scatteredLepton.px(),
+      initialLepton.py() - scatteredLepton.py(),
+      initialLepton.pz() - scatteredLepton.pz(),
+      initialLepton.e()  - scatteredLepton.e()
+    );
 
+    /////////////////////////////// DIS CUTS //////////////////////////////////////
+    // Q2 = − q2
+    double Q2 = - q4.m2Calc();
+      
+    // Bjorken x
+    double dot_pq = initialTarget.e() * q4.e()
+                  - (initialTarget.px()*q4.px() + initialTarget.py()*q4.py() + initialTarget.pz()*q4.pz());
+    double x_bj = Q2 / (2.0 * dot_pq);
+
+    // Nu
+    double nu = q4.e();
+
+    // W2
+    double Mp = target_mass;
+    double W2 = Mp*Mp + 2.0 * Mp * nu - Q2;
+    double W  = (W2 > 0.0 ? std::sqrt(W2) : -1.0);
+
+    // apply cuts on Q2, x, W
+    if(cut_Q2_enabled) {
+      if(Q2 < cut_Q2_min || Q2 > cut_Q2_max) {
+        if(clas::enable_verbose_mode)
+          fmt::println("  >> FAIL Q2 cut: Q2 = {:.3g}", Q2);
+        continue;
+      }
+    }
+    if(cut_x_enabled) {
+      if(x_bj < cut_x_min || x_bj > cut_x_max) {
+        if(clas::enable_verbose_mode)
+          fmt::println("  >> FAIL x cut: x = {:.3g}", x_bj);
+        continue;
+      }
+    }
+    if(cut_W_enabled) {
+      if(W < cut_W_min || W > cut_W_max) {
+        if(clas::enable_verbose_mode)
+          fmt::println("  >> FAIL W cut: W = {:.3g}", W);
+        continue;
+      }
+    }
+      
     // check required inclusive particles
     if(!cut_inclusive.Check(evt))
       continue;
@@ -750,25 +903,8 @@ int main(int argc, char** argv)
 
     // check dihadron z cuts
     if(cut_z_2h.Enabled() || save_kin) {
-      
-      // find scattered lepton
-      auto const lepton_idx = FindScatteredLepton(evt);
-      if(!lepton_idx.has_value()) { // no scattered lepton -> skip event
-        if(clas::enable_verbose_mode) fmt::println("no scattered lepton found");
-        continue;
-      }
 
-      // calculate z using P.Ph / P.q
-      // FIXME: may be broken, because of `patch_boost` issue...
-      // // virtaul photon momentum
-      // auto const vec_q = evt.at(BEAM_PDG).p() - evt.at(lepton_idx.value()).p();
-      // // calculate z
-      // auto const vec_target = evt.at(TARGET_ROW).p();
-      // auto get_z_2h = [&vec_target, &vec_q] (Pythia8::Particle const& parA, Pythia8::Particle const& parB) {
-      //   return (vec_target * (parA.p()+parB.p())) / (vec_target * vec_q); // P.Ph / P.q
-      // };
-      // FIXME: instead, calculate z using simple formula
-      auto nu = evt.at(BEAM_ROW).e() - evt.at(lepton_idx.value()).e();
+      // nu already calculate from DIS cuts
       auto get_z_2h = [&nu] (Pythia8::Particle const& parA, Pythia8::Particle const& parB) {
         return (parA.e() + parB.e()) / nu;
       };
