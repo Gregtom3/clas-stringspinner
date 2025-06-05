@@ -339,6 +339,7 @@ int main(int argc, char** argv)
   auto& proc = pyth.process;
   auto& pdt  = pyth.particleData;
 
+
   // get the configuration function
   std::function<void(Pythia8::Pythia&)> apply_config_func;
   try {
@@ -477,6 +478,7 @@ int main(int argc, char** argv)
   //// seed
   set_config(pyth, "Random:setSeed = on");
   set_config(pyth, fmt::format("Random:seed = {}", seed));
+
   //// beam polarization
   if(obj_is_polarized[objBeam]) {
     for(auto quark : std::vector<std::string>{"u", "d", "s", "ubar", "dbar", "sbar"})
@@ -599,15 +601,16 @@ int main(int argc, char** argv)
     if(!cut_theta.Check(evt, get_theta))
       continue;
 
+
     // pair dihadrons
     std::vector<clas::DihadronKin> dih_kin;
     if(save_kin || cut_z_2h.Enabled()) { // but only if we need to
       for(int a = 0; a < evt.size(); a++) {
         auto const& parA = evt.at(a);
-        if(parA.isFinal()) {
+        if(parA.isFinal() || parA.id() == 111) {
           for(int b = a + 1; b < evt.size(); b++) {
             auto const& parB = evt.at(b);
-            if(parB.isFinal()) {
+            if(parB.isFinal() || parB.id() == 111) {
               dih_kin.push_back({
                   .idxA = a,
                   .idxB = b,
@@ -623,7 +626,7 @@ int main(int argc, char** argv)
 
     // check dihadron z cuts
     if(cut_z_2h.Enabled() || save_kin) {
-
+      
       // find scattered lepton
       auto const lepton_idx = FindScatteredLepton(evt);
       if(!lepton_idx.has_value()) { // no scattered lepton -> skip event
