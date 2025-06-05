@@ -182,6 +182,9 @@ namespace clas {
         return false; // no satisfactory dihadron
       }
 
+      /// @returns a const reference to the underlying PDG list
+      std::vector<int> const& GetPDGList() const { return m_pdg_list; }
+
     private:
       /// the name of the checklist should match the CLI option name
       std::string const m_opt_name;

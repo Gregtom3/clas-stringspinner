@@ -602,24 +602,130 @@ int main(int argc, char** argv)
       continue;
 
 
-    // pair dihadrons
+    //
+    // First, loop over final state photons (pid==22) and form pi0's.
+    // For each unique (gamma_i, gamma_j) pair we append a fake pi0 (pid=111, status=-1)
+    // to evt.  Its daughters are the two photon indices; all other fields (mothers, vx,vy,vz,tau) are 0.
+    //
+    std::vector<int> photonIndices;
+    for(int i = 0; i < evt.size(); i++) {
+      auto const& p = evt.at(i);
+      if(p.isFinal() && p.id() == 22) {
+        photonIndices.push_back(i);
+      }
+    }
+    for(size_t ia = 0; ia < photonIndices.size(); ia++) {
+      for(size_t ib = ia + 1; ib < photonIndices.size(); ib++) {
+        int iA = photonIndices[ia];
+        int iB = photonIndices[ib];
+        auto const& gA = evt.at(iA);
+        auto const& gB = evt.at(iB);
+        // Build each photon’s 4‐vector
+        Pythia8::Vec4 p4A(gA.px(), gA.py(), gA.pz(), gA.e());
+        Pythia8::Vec4 p4B(gB.px(), gB.py(), gB.pz(), gB.e());
+        Pythia8::Vec4 sum4 = p4A + p4B;
+
+        // pi0 mass (GeV)
+        constexpr double mPi0 = 0.1349766;
+        double epi0  = sum4.e();
+        double px0  = sum4.px();
+        double py0  = sum4.py();
+        double pz0  = sum4.pz();
+        double m0   = mPi0;
+
+        // Append pi0
+        evt.append(
+          /* id    */ 111,
+          /* status*/ -1,
+          /* mother1*/ 0,
+          /* mother2*/ 0,
+          /* daughter1*/ iA,
+          /* daughter2*/ iB,
+          /* col (see https://www.pythia.org/doxygen/pythia8312/classPythia8_1_1Event.html#ae79b4dd58ff0d04a09d99a2f3c7dfa0b) */ 0.0,
+          /* acol   */ 0.0,
+          /* px   */ px0,
+          /* py   */ py0,
+          /* pz   */ pz0,
+          /* e    */ epi0,
+          /* m    */ m0
+        );
+
+      }
+    }
+
+    static const std::vector<std::pair<int,int>> acceptable_pairs = {
+        {  211, -211 },  
+        {  211,  111 },  
+        {  211,  211 }, 
+        {  -211,  111 },  
+        {  -211, -211 }, 
+    };
+    
+
     std::vector<clas::DihadronKin> dih_kin;
-    if(save_kin || cut_z_2h.Enabled()) { // but only if we need to
-      for(int a = 0; a < evt.size(); a++) {
+    if (save_kin || cut_z_2h.Enabled()) {
+      for (int a = 0; a < evt.size(); ++a) {
         auto const& parA = evt.at(a);
-        if(parA.isFinal() || parA.id() == 111) {
-          for(int b = a + 1; b < evt.size(); b++) {
-            auto const& parB = evt.at(b);
-            if(parB.isFinal() || parB.id() == 111) {
-              dih_kin.push_back({
-                  .idxA = a,
-                  .idxB = b,
-                  .pdgA = parA.id(),
-                  .pdgB = parB.id(),
-                  .z    = -1
-                  });
-            }
+        bool isPi0FakeA = (parA.id() == 111 && parA.status() == -1);
+        // Only “final” or fake π⁰ is allowed
+        if (!(parA.isFinal() || isPi0FakeA)) continue;
+    
+        for (int b = 0; b < evt.size(); ++b) {
+          if (a == b) continue;
+    
+          auto const& parB = evt.at(b);
+          bool isPi0FakeB = (parB.id() == 111 && parB.status() == -1);
+          if (!(parB.isFinal() || isPi0FakeB)) continue;
+    
+          int pdgA = parA.id();
+          int pdgB = parB.id();
+    
+          // Build both (A,B) and (B,A) candidates
+          auto candAB = std::make_pair(pdgA, pdgB);
+          auto candBA = std::make_pair(pdgB, pdgA);
+    
+          // Check which orientation (if any) is in acceptable_pairs
+          bool inListAB = (std::find(
+                             acceptable_pairs.begin(),
+                             acceptable_pairs.end(),
+                             candAB
+                           ) != acceptable_pairs.end());
+    
+          bool inListBA = (std::find(
+                             acceptable_pairs.begin(),
+                             acceptable_pairs.end(),
+                             candBA
+                           ) != acceptable_pairs.end());
+    
+          // If neither (A,B) nor (B,A) is in the list, skip
+          if (!inListAB && !inListBA) {
+            continue;
           }
+    
+          // Determine how to order idxA/idxB and pdgA/pdgB for pushing
+          int out_idxA, out_idxB, out_pdgA, out_pdgB;
+          if (inListAB) {
+            // The current ordering (a,b) matches the preferred pair ordering
+            out_idxA = a;
+            out_idxB = b;
+            out_pdgA = pdgA;
+            out_pdgB = pdgB;
+          }
+          else {
+            // (B,A) is in acceptable_pairs, so swap them
+            out_idxA = b;
+            out_idxB = a;
+            out_pdgA = pdgB;
+            out_pdgB = pdgA;
+          }
+    
+          dih_kin.push_back({
+            .idxA = out_idxA,
+            .idxB = out_idxB,
+            .pdgA = out_pdgA,
+            .pdgB = out_pdgB,
+            .z    = -1
+          });
         }
       }
     }
