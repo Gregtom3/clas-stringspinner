@@ -50,7 +50,8 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
     double px_b, py_b, pz_b, E_b, p_b, theta_b, phi_b;
 
     double Mh, z1, z2, z, phi_h, phi_R, dihadron_th, pT_lab, Mx, xF1, xF2;
-
+    int is_rho   = false;
+    int is_omega = false;
     // Helper lambda to set up identical branches on any TTree pointer
     auto setupBranches = [&](TTree* t) {
         t->Branch("x",   &x,   "x/D");
@@ -95,6 +96,8 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
         t->Branch("phi_R1",  &phi_R,      "phi_R1/D");
         t->Branch("th",      &dihadron_th,"th/D");
         t->Branch("pTtot",  &pT_lab,     "pTtot/D");
+        t->Branch("is_rho",   &is_rho,   "is_rho/I");
+        t->Branch("is_omega", &is_omega, "is_omega/I");
     };
 
     // Apply the same branches to all 10 TTrees
@@ -250,7 +253,10 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
                 const auto& pminus = parts[im];
                 TLorentzVector lv_pip(pplus.px,  pplus.py,  pplus.pz,  pplus.E);
                 TLorentzVector lv_pim(pminus.px, pminus.py, pminus.pz, pminus.E);
-
+                int parent_plus  = parts[ip].parentpid;
+                int parent_minus = parts[im].parentpid;
+                is_rho   = (parent_plus  == parent_minus && parent_plus  == 113);
+                is_omega = (parent_plus  == parent_minus && parent_plus  == 223);
                 // 1) Fill the “original” TTree unconditionally
                 if(fill_original==true){
                     fillTree(tree_ppim, lv_pip, lv_pim);
@@ -318,7 +324,7 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
                 for (size_t i2 = i1 + 1; i2 < pho_idx.size(); ++i2) {
                     int i = pho_idx[i1], j = pho_idx[i2];
                     if (parts[i].parentid != parts[j].parentid) continue; // require same parent (=111)
-
+                    
                     const auto& ph1 = parts[i];
                     const auto& ph2 = parts[j];
 
@@ -328,7 +334,13 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
                     TLorentzVector lv_ph1(ph1.px, ph1.py, ph1.pz, ph1.E);
                     TLorentzVector lv_ph2(ph2.px, ph2.py, ph2.pz, ph2.E);
                     TLorentzVector lv_pi0 = lv_ph1 + lv_ph2;
-
+                    int pi0_id = parts[i].parentid;  
+                    auto it0   = std::find_if(parts.begin(), parts.end(),
+                                  [pi0_id](auto const& p){ return p.id == pi0_id; });
+                    int parent_pi0 = (it0 != parts.end() ? it0->parentpid : -1);
+                    int parent_pip = parts[ip].parentpid;
+                    is_rho   = (parent_pip == 213 && parent_pi0 == 213);
+                    is_omega = (parent_pip == 223 && parent_pi0 == 223);
                     // 1) Fill the “original” π⁺–π⁰ tree (no acceptance cuts)
                     if(fill_original==true){
                         fillTree(tree_ppiz, lv_pip, lv_pi0);
@@ -406,7 +418,13 @@ void lund2tree(const char* infile, const char* outputFile = "dihadron.root") {
                     TLorentzVector lv_ph1(ph1.px, ph1.py, ph1.pz, ph1.E);
                     TLorentzVector lv_ph2(ph2.px, ph2.py, ph2.pz, ph2.E);
                     TLorentzVector lv_pi0 = lv_ph1 + lv_ph2;
-
+                    int pi0_id = parts[i].parentid;  
+                    auto it0   = std::find_if(parts.begin(), parts.end(),
+                                  [pi0_id](auto const& p){ return p.id == pi0_id; });
+                    int parent_pi0 = (it0 != parts.end() ? it0->parentpid : -1);
+                    int parent_pim = parts[im].parentpid;
+                    is_rho   = (parent_pim == -213 && parent_pi0 == -213);
+                    is_omega = (parent_pim ==  223 && parent_pi0 ==  223);
                     // Fill original π⁻–π⁰ tree
                     if(fill_original==true){
                         fillTree(tree_pmiz, lv_pim, lv_pi0);

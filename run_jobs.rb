@@ -20,7 +20,7 @@ parser = OptionParser.new do |opts|
   end
 
   opts.on("-o", "--outdir DIR", String,
-          "Output directory under out/ (required)") do |d|
+          "Output directory under /volatile/clas12/users/gmat/osg/clas-stringspinner/ (required)") do |d|
     options[:outdir] = d
   end
 
@@ -65,7 +65,7 @@ if options[:outdir].nil?
 end
 
 # Prepare base directory
-base_outdir = File.join('out', options[:outdir])
+base_outdir = File.join('/volatile/clas12/users/gmat/osg/clas-stringspinner/', options[:outdir])
 if Dir.exist?(base_outdir)
   print "Directory #{base_outdir} exists. Overwrite? [y/N]: "
   answer = STDIN.gets.chomp
@@ -97,7 +97,7 @@ if options[:slurm]
       suffix      = format('%05d', i + 1)
       seed        = rand(1_000_000_000)
       job_name    = "#{pol}_#{spin}_#{suffix}"
-      dat_file    = File.join(base_outdir, "clas_#{job_name}.dat")
+      dat_file    = File.join(base_outdir, "clas_#{job_name}.txt")
       hipo_file   = File.join(base_outdir, "clas_#{job_name}.hipo")
       cooked_tmp  = File.join(base_outdir, "clas_#{job_name}_cooked_.hipo")
       cooked_file = File.join(base_outdir, "clas_#{job_name}_cooked.hipo")
@@ -108,7 +108,7 @@ if options[:slurm]
       File.open(script_path, 'w') do |f|
         f.puts "#!/bin/bash"
         f.puts "#SBATCH --account=clas12"
-        f.puts "#SBATCH --partition=scavenger"
+        f.puts "#SBATCH --partition=production"
         f.puts "#SBATCH --mem-per-cpu=2000"
         f.puts "#SBATCH --job-name=#{job_name}"
         f.puts "#SBATCH --cpus-per-task=2"
@@ -209,7 +209,7 @@ else
       suffix      = format('%05d', i + 1)
       seed        = rand(1_000_000_000)
       job_name    = "#{pol}_#{spin}_#{suffix}"
-      dat_file    = File.join(base_outdir, "clas_#{job_name}.dat")
+      dat_file    = File.join(base_outdir, "clas_#{job_name}.txt")
       hipo_file   = File.join(base_outdir, "clas_#{job_name}.hipo")
       cooked_tmp  = File.join(base_outdir, "clas_#{job_name}_cooked_.hipo")
       cooked_file = File.join(base_outdir, "clas_#{job_name}_cooked.hipo")
