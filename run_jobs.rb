@@ -189,6 +189,8 @@ if options[:slurm]
       f.puts "#SBATCH --account=clas12"
       f.puts "#SBATCH --partition=production"
       f.puts "#SBATCH --dependency=afterok:#{dep}"
+      f.puts "#SBATCH --mem-per-cpu=4000"
+      f.puts "#SBATCH --cpus-per-task=4"
       f.puts "#SBATCH --output=#{File.join(base_outdir, 'log', 'merge_all.log')}"
       f.puts "#SBATCH --error=#{File.join(base_outdir, 'err', 'merge_all.err')}"
       f.puts

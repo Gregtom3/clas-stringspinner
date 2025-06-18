@@ -9,7 +9,7 @@
 #include <algorithm>
 #include "Kinematics.h"
 
-const bool fill_original = true;
+const bool fill_original = false;
 
 // A simplified struct holding each final‐state particle’s information
 struct SimplePart {
